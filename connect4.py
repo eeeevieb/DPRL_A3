@@ -4,6 +4,24 @@ NUM_ROWS = 6
 NUM_COLUMNS = 7
 EXPLORATION_PARAMETER = np.sqrt(2.)
 
+class Node:
+    def __init__(self, board, parent=None, last_move=None):
+        self.board = board
+        self.parent = parent
+        self.last_move = last_move  # The move that led to this node
+        self.player_to_move = 1 if last_move==None else 3 + (board[last_move])  # opposite of prev player
+        self.children = np.empty(NUM_COLUMNS, dtype=Node)
+        self.score = 0
+        self.ucb = 0
+        self.visits = 0
+
+    def expand(self):
+        # Expand the node by creating child nodes for each possible action
+        for a in possible_actions(self.board):
+            child_board = np.copy(self.board)
+            move = make_move(child_board, a, self.player_to_move)
+            self.children[a] = Node(child_board, self, move)
+
 def print_tree(node, depth=0, max_depth=3):
     if depth > max_depth:  # Limit the depth to avoid excessive output
         return
@@ -18,37 +36,7 @@ def print_tree(node, depth=0, max_depth=3):
         if child is not None:
             print_tree(child, depth + 1, max_depth)
 
-
-class Node:
-    def __init__(self, board, parent=None, last_move=None):
-        self.board = board
-        self.parent = parent
-        self.last_move = last_move  # The move that led to this node
-        self.children = np.empty(NUM_COLUMNS, dtype=Node)
-        self.score = 0
-        self.ucb = 0
-        self.visits = 0
-
-    def is_terminal(self):
-        # Check if this node's state is a game-ending state
-        return game_state_is_terminal(self.board, self.last_move) != 0
-
-    def expand(self):
-        # Expand the node by creating child nodes for each possible action
-        for a in possible_actions(self.board):
-            child_board = np.copy(self.board)
-            move = make_move(child_board, a)
-            self.children[a] = Node(child_board, self, move)
-
-def evaluate_game_state(node):
-    # Basic evaluation: return game result if terminal, otherwise return 0
-    result = game_state_is_terminal(node.board, node.last_move)
-    if result != 0:
-        return 1 if result == 1 else -1  # Assuming AI is player 1
-    return 0
-
 def display_board(board):
-    # Display the board
     print()
     for row in reversed(range(NUM_ROWS)):
         print('|', end='')
@@ -97,19 +85,18 @@ def possible_actions(board):
     # Find columns that are not yet full for the next move
     return [col for col in range(NUM_COLUMNS) if board[NUM_ROWS - 1, col] == 0]
 
-def make_move(board, col):
+def make_move(board, col, player):
     for row in range(NUM_ROWS):
         if board[row, col] == 0:
-            board[row, col] = 1 + (turn & 1)
+            board[row, col] = player
             return (row, col)
 
-def evaluate_game_state(node):
+def evaluate_game_state(node, player):
     winner = game_state_is_terminal(node.board, node.last_move)
-    if winner == 1:     # Opponent wins
-        return -1
-    elif winner == 2:   # Player wins
-        return 1
-    return 0            # Draw or ongoing game
+    if winner == 0:         # Game not over yet
+        return 0
+    foo = 1 if winner == player else -1
+    return foo
 
 def select_best_action(node):
     # Implement UCB for action selection
@@ -129,7 +116,6 @@ def select_best_action(node):
         explore = EXPLORATION_PARAMETER * np.sqrt(log_total_visits / child.visits)
         ucb_score = exploit + explore
 
-        print(ucb_score)
         if ucb_score > best_score:
             best_score = ucb_score
             best_action = action
@@ -139,19 +125,13 @@ def select_best_action(node):
 
 def update_node_stats(node, action, score):
     # Update the node's statistics
-    # child_node = node.children[action]
-    # child_node.visits += 1
-    # child_node.score += score
-
-    # Update the parent node's statistics
     node.visits += 1
     node.score += score
 
-
-def MCTS(node, depth=10):
+def MCTS(node, player, depth=10):
     if depth == 0 or game_state_is_terminal(node.board, node.last_move):
         # Evaluate the game state and return the score
-        return evaluate_game_state(node)
+        return evaluate_game_state(node, player)
 
     # Expansion
     if not np.any(node.children):
@@ -162,8 +142,7 @@ def MCTS(node, depth=10):
         action = select_best_action(node)    
     
     # Simulate: Recursively call MCTS
-    child_node = node.children[action]
-    score = MCTS(child_node, depth - 1)
+    score = MCTS(node.children[action], player, depth - 1)
 
     # Backpropagation: Update the current node's statistics
     update_node_stats(node, action, score)
@@ -171,40 +150,20 @@ def MCTS(node, depth=10):
     return score
 
 if __name__ == "__main__":
-    board = np.array([[0,0,2,0,0,1,0],
-             [0,0,2,0,0,1,0],
-             [0,0,0,0,0,1,0],
-             [0,0,0,0,0,0,0],
-             [0,0,0,0,0,0,0],
-             [0,0,0,0,0,0,0]])
-    # display_board(board)
-    root_node = Node(np.copy(board)) 
-    turn = 1
-    for _ in range(10):
-        MCTS(root_node, depth=10)            
-    #print('node:', root_node.score, root_node.visits)
-    #for child in root_node.children:
-    #    print(child.score, child.visits)
-    print_tree(root_node)
-    make_move(board, select_best_action(root_node)) #FIXME correct move based on MCTS results
-    display_board(board)
-    winner = game_state_is_terminal(board, None)
-    print(f"Winner: {'Draw' if winner == -1 else 'Player ' + str(winner)}")
-    
-    """board = np.zeros((NUM_ROWS, NUM_COLUMNS), dtype=int)
+    board = np.zeros((NUM_ROWS, NUM_COLUMNS), dtype=int)
     turn = 0
     while not game_state_is_terminal(board, None):
         if turn & 1:            # Player turn  
             root_node = Node(np.copy(board))    # TODO Use the same root node and simply traverse it when moves are made
-            for _ in range(1):
-                MCTS(root_node, depth=10)            
-            make_move(board, select_best_action(root_node)) #FIXME correct move based on MCTS results
+            for _ in range(100):
+                MCTS(root_node, 2, depth=10)            
+            make_move(board, select_best_action(root_node), 2) #FIXME correct move based on MCTS results
         else:                   # Opponent turn   
             # choose AI move randomly among possible actions
-            make_move(board, np.random.choice(possible_actions(board)))
+            make_move(board, np.random.choice(possible_actions(board)), 1)
         turn += 1
 
         display_board(board)
 
     winner = game_state_is_terminal(board, None)
-    print(f"Winner: {'Draw' if winner == -1 else 'Player ' + str(winner)}")"""
+    print(f"Winner: {'Draw' if winner == -1 else 'Player ' + str(winner)}")
