@@ -3,6 +3,7 @@ import numpy as np
 NUM_ROWS = 6
 NUM_COLUMNS = 7
 EXPLORATION_PARAMETER = np.sqrt(2.)
+EPSILON = 0.0001
 
 class Node:
     def __init__(self, board, parent=None, last_move=None):
@@ -101,7 +102,7 @@ def evaluate_game_state(node):       # returns 1 if win, -1 if loss, 0 if game n
 def select_best_action(node, player=2, debug=False):
     # UCB for action selection
     total_visits = sum(child.visits for child in node.children if child is not None)     #TODO is this just equal to node.visits?
-    log_total_visits = np.log(total_visits)  # Avoid division by zero
+    log_total_visits = np.log(total_visits or 1)  # Avoid division by zero
     best_score = -float('inf')
     best_action = None
 
@@ -154,6 +155,18 @@ def MCTS(node, player=2, depth=10):
 
     return score
 
+def MCTS_until_convergence(node, depth=20):
+    score = node.score / ( node.visits or 1 )
+    iter = 0
+    while True:
+        iter += 1
+        MCTS(node, depth)
+        old_score = score
+        score = node.score / ( node.visits or 1 )
+        if 0. < abs(score - old_score) < EPSILON:
+            break
+    print(iter)
+
 if __name__ == "__main__":
     # Board Setup
     board = np.zeros((NUM_ROWS, NUM_COLUMNS), dtype=int)
@@ -161,13 +174,11 @@ if __name__ == "__main__":
 
     # Initial Training
     node = root_node = Node(np.copy(board))
-    for _ in range(1000):
-        MCTS(root_node, depth=20)
+    MCTS_until_convergence(root_node)
 
     while not game_state_is_terminal(board, None):
         if turn & 1:            # Player turn  
-            for _ in range(100):
-                MCTS(node, depth=10)            
+            MCTS_until_convergence(node)           
             action = select_best_action(node, debug=True)
             print_tree(node, max_depth=1)
         else:                   # Opponent turn   
