@@ -1,4 +1,5 @@
 import numpy as np
+import time
 
 NUM_ROWS = 6
 NUM_COLUMNS = 7
@@ -66,17 +67,14 @@ def check_line_match(board, row, col, dir_row, dir_col):    #FIXME indices roll 
     return False
 
 def game_state_is_terminal(board, last_move):
-    #if last_move is None:
-    #    return 0  # Continue if no move has been made yet
-    #row, col = last_move
+    if last_move is None:
+        return 0  # Continue if no move has been made yet
 
-    for row in range(NUM_ROWS):     #FIXME Use last_move
-        for col in range(NUM_COLUMNS):
-            # Directions: horizontal, vertical, both diagonals
-            directions = [(0, 1), (1, 0), (1, 1), (1, -1)]
-            for dr, dc in directions:
-                if check_line_match(board, row, col, dr, dc):
-                    return board[row, col]  # Return the winning player
+    row, col = last_move
+    directions = [(0, 1), (1, 0), (1, 1), (1, -1)]  # Directions: horizontal, vertical, diagonal, anti-diagonal
+    for dr, dc in directions:
+        if check_line_match(board, row, col, dr, dc):
+            return board[row, col]  # Return the winning player
 
     if np.all(board != 0):
         return -1  # Draw
@@ -134,7 +132,7 @@ def update_node_stats(node, action, score):
     node.visits += 1
     node.score += score
 
-def MCTS(node, player=2, depth=10):
+def MCTS(node, player=2, depth=20):
     if depth == 0 or game_state_is_terminal(node.board, node.last_move):
         # Evaluate the game state and return the score
         return evaluate_game_state(node)
@@ -155,36 +153,41 @@ def MCTS(node, player=2, depth=10):
 
     return score
 
-def MCTS_until_convergence(node, depth=20):
+def MCTS_until_convergence(node, depth=15):
     score = node.score / ( node.visits or 1 )
     iter = 0
     while True:
-        iter += 1
-        MCTS(node, depth)
-        old_score = score
-        score = node.score / ( node.visits or 1 )
-        if 0. < abs(score - old_score) < EPSILON:
-            break
-    print(iter)
+        for _ in range(100):
+            iter += 1
+            MCTS(node, depth)
+            old_score = score
+            score = node.score / ( node.visits or 1 )
+            if 0. < abs(score - old_score) < EPSILON:
+                print("iter:", iter, end="\r")
+                return
+        print("iter:", iter, end="\r")
+
+start = time.time()
 
 if __name__ == "__main__":
     # Board Setup
     board = np.zeros((NUM_ROWS, NUM_COLUMNS), dtype=int)
+    last_move = None
     turn = 0
 
     # Initial Training
     node = root_node = Node(np.copy(board))
-    MCTS_until_convergence(root_node)
+    root_node.expand()  # So we don't get null pointer issues when opponent moves first
 
-    while not game_state_is_terminal(board, None):
+    while not game_state_is_terminal(board, last_move):
         if turn & 1:            # Player turn  
-            MCTS_until_convergence(node)           
-            action = select_best_action(node, debug=True)
-            print_tree(node, max_depth=1)
+            MCTS_until_convergence(node)
+            action = select_best_action(node)
+            #print_tree(node, max_depth=1)
         else:                   # Opponent turn   
             action = np.random.choice(possible_actions(board))
         
-        make_move(board, action, 1 + (turn & 1))
+        last_move = make_move(board, action, 1 + (turn & 1))
         node = node.children[action]
         turn += 1
 
@@ -193,3 +196,5 @@ if __name__ == "__main__":
     winner = game_state_is_terminal(board, None)
     print(f"Winner: {'Draw' if winner == -1 else 'Player ' + str(winner)}")
     #print_tree(root_node, max_depth=2)
+
+print(time.time() - start)
