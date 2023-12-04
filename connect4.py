@@ -171,40 +171,41 @@ def MCTS(node, turn, depth=10):
     return score
 
 if __name__ == "__main__":
-    board = np.array([[0,0,2,0,0,1,0],
-             [0,0,2,0,0,1,0],
-             [0,0,0,0,0,1,0],
-             [0,0,0,0,0,0,0],
-             [0,0,0,0,0,0,0],
-             [0,0,0,0,0,0,0]])
-    # display_board(board)
-    root_node = Node(np.copy(board)) 
-    turn = 1
-    for _ in range(1000):
-        MCTS(root_node, turn, depth=10)            
-    #print('node:', root_node.score, root_node.visits)
-    #for child in root_node.children:
-    #    print(child.score, child.visits)
-    print_tree(root_node)
-    make_move(board, select_best_action(root_node), turn) #FIXME correct move based on MCTS results
+    board = np.array([[1,2,2,2,1,1,2],
+                      [0,2,1,1,2,1,0],
+                      [0,2,2,2,1,2,0],
+                      [0,1,1,1,2,1,0],
+                      [0,2,2,1,1,2,0],
+                      [0,2,1,1,2,1,0]])
     display_board(board)
-    winner = game_state_is_terminal(board, None)
-    print(f"Winner: {'Draw' if winner == -1 else 'Player ' + str(winner)}")
-    
-    # board = np.zeros((NUM_ROWS, NUM_COLUMNS), dtype=int)
-    # turn = 0
-    # while not game_state_is_terminal(board, None):
-    #     if turn & 1:            # Player turn  
-    #         root_node = Node(np.copy(board))    # TODO Use the same root node and simply traverse it when moves are made
-    #         for _ in range(100):
-    #             MCTS(root_node, turn, depth=10)            
-    #         make_move(board, select_best_action(root_node), turn) #FIXME correct move based on MCTS results
-    #     else:                   # Opponent turn   
-    #         # choose AI move randomly among possible actions
-    #         make_move(board, np.random.choice(possible_actions(board)), turn)
-    #     turn += 1
-
-    #     display_board(board)
-
+    # root_node = Node(np.copy(board)) 
+    # turn = 1
+    # for _ in range(1000):
+    #     MCTS(root_node, turn, depth=10)            
+    # #print('node:', root_node.score, root_node.visits)
+    # #for child in root_node.children:
+    # #    print(child.score, child.visits)
+    # print_tree(root_node)
+    # print(select_best_action(root_node))
+    # make_move(board, select_best_action(root_node), turn) #FIXME correct move based on MCTS results
+    # display_board(board)
     # winner = game_state_is_terminal(board, None)
     # print(f"Winner: {'Draw' if winner == -1 else 'Player ' + str(winner)}")
+    
+    # board = np.zeros((NUM_ROWS, NUM_COLUMNS), dtype=int)
+    turn = 1
+    while not game_state_is_terminal(board, None):
+        if turn & 1:            # Player turn  
+            root_node = Node(np.copy(board))    # TODO Use the same root node and simply traverse it when moves are made
+            for _ in range(100):
+                MCTS(root_node, turn, depth=10)            
+            make_move(board, select_best_action(root_node), turn) #FIXME correct move based on MCTS results
+        else:                   # Opponent turn   
+            # choose AI move randomly among possible actions
+            make_move(board, np.random.choice(possible_actions(board)), turn)
+        turn += 1
+
+        display_board(board)
+
+    winner = game_state_is_terminal(board, None)
+    print(f"Winner: {'Draw' if winner == -1 else 'Player ' + str(winner)}")
