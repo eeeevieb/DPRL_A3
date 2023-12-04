@@ -5,6 +5,7 @@ NUM_ROWS = 6
 NUM_COLUMNS = 7
 EXPLORATION_PARAMETER = np.sqrt(2.)
 EPSILON = 0.0001
+NUM_SIMS = 10
 
 class Node:
     def __init__(self, board, parent=None, last_move=None):
@@ -153,46 +154,49 @@ def MCTS(node, player=2, depth=20):
 
 def MCTS_until_convergence(node, depth=15):
     score = node.score / ( node.visits or 1 )
+    count = 0
     while True:
         for _ in range(100):
-            global count; count += 1
+            count += 1
             MCTS(node, depth)
             old_score = score
             score = node.score / ( node.visits or 1 )
             if 0. < abs(score - old_score) < EPSILON:
                 print("iter:", count, end="\r")
                 return
-        print("iter:", count, end="\r")
+        print("iter:", count, end="   \r")
 
-start = time.time()
 
-if __name__ == "__main__":
-    count = 0
-
-    # Board Setup
+def simulate_game():
     board = np.zeros((NUM_ROWS, NUM_COLUMNS), dtype=int)
     last_move = None
     turn = 0
-
-    # Initial Training
-    node = root_node = Node(np.copy(board))
+    root_node = node = Node(np.copy(board))
 
     while not game_state_is_terminal(board, last_move):
-        if turn & 1:            # Player turn  
+        if turn & 1:  # Player turn
             MCTS_until_convergence(node)
             action = select_best_action(node)
-            #print_tree(node, max_depth=1)
-        else:                   # Opponent turn   
+        else:  # Opponent turn
             action = np.random.choice(possible_actions(board))
 
         last_move = make_move(board, action, 1 + (turn & 1))
-        node = node.get_child(action)
+        node = node.children[action] if node.children[action] is not None else Node(np.copy(board))
         turn += 1
 
-        display_board(board)
+    return root_node, game_state_is_terminal(board, last_move)
 
-    winner = game_state_is_terminal(board, None)
-    print(f"Winner: {'Draw' if winner == -1 else 'Player ' + str(winner)}")
-    print_tree(root_node, max_depth=3)
+if __name__ == "__main__":
+    #start = time.time()
 
-print("Time per iter:", (time.time() - start) / count)
+    results = np.zeros(3)   # Draw, Loss, Win
+    for _ in range(NUM_SIMS):
+        root_node, winner = simulate_game()
+        results[winner] += 1
+
+    print("Draw, Loss, Win:", results)
+    print("Win Rate:", results[2] / NUM_SIMS)
+    #print(f"Winner: {'Draw' if winner == -1 else 'Player ' + str(winner)}")
+    #print_tree(root_node, max_depth=3)
+
+    #print("Time per iter:", (time.time() - start) / count)
