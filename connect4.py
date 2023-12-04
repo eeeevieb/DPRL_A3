@@ -4,8 +4,8 @@ import time
 NUM_ROWS = 6
 NUM_COLUMNS = 7
 EXPLORATION_PARAMETER = np.sqrt(2.)
-EPSILON = 0.0001
-NUM_SIMS = 2
+EPSILON = 0.01
+NUM_SIMS = 100
 
 class Node:
     def __init__(self, board, parent=None, last_move=None):
@@ -181,10 +181,10 @@ def run_sim():
         node = node.get_child(action)
         turn += 1
 
-        display_board(board)
+    # display_board(board)
 
     winner = game_state_is_terminal(board, last_move)
-    print(f"Winner: {'Draw' if winner == -1 else 'Player ' + str(winner)}")
+    # print(f"Winner: {'Draw' if winner == -1 else 'Player ' + str(winner)}")
     #print_tree(root_node, max_depth=3)
     return winner
 
