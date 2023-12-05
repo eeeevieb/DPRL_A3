@@ -19,7 +19,7 @@ class Node:
         self.visits = 0
 
     def get_child(self, action):
-        if self.children[action] is None:   #
+        if self.children[action] is None:   # Lazy expansion
             child_board = np.copy(self.board)
             move = make_move(child_board, action, self.player_to_move)
             self.children[action] = Node(child_board, self, move)
@@ -48,7 +48,7 @@ def display_board(board):
             print(token, end='|')
         print()
 
-def check_line_match(board, row, col, dir_row, dir_col):    #FIXME indices roll over (e.g. cylinder)
+def check_line_match(board, row, col, dir_row, dir_col):
     """Check for 4 in a line from (row, col) in both directions along (d_row, d_col)"""
     player = board[row, col]
     if player == 0:
@@ -81,8 +81,7 @@ def game_state_is_terminal(board, last_move):
 
     return 0  # Game not finished
 
-def possible_actions(board):
-    # Find columns that are not yet full for the next move
+def possible_actions(board):    # Find columns that are not yet full for the next move
     return [col for col in range(NUM_COLUMNS) if board[NUM_ROWS - 1, col] == 0]
 
 def make_move(board, col, player):
@@ -91,108 +90,104 @@ def make_move(board, col, player):
             board[row, col] = player
             return (row, col)
 
-def evaluate_game_state(node):       # returns 1 if win, -1 if loss, 0 if game not over yet
-    winner = game_state_is_terminal(node.board, node.last_move)
-    if winner == 0:
-        return 0
-    return 1 if winner == 2 else -1
-
-def select_best_action(node, player=2, debug=False):
+def select_best_action_ucb(node, player=2):
     # UCB for action selection
-    total_visits = sum(child.visits if child is not None else 0 for child in node.children)     #TODO is this just equal to node.visits?
-    log_total_visits = np.log(total_visits or 1)  # Avoid division by zero
+    log_parent_visits = np.log(node.visits or 1)  # Avoid division by zero
     best_score = -float('inf')
     best_action = None
 
     for action, child in enumerate(node.children):
-        if child is None:
-            return action  # Prioritize unvisited nodes
+        if child is None:                           #TODO what to do with unvisited children?
+            return action
 
         # UCB formula
         exploit = child.score / child.visits
-        explore = EXPLORATION_PARAMETER * np.sqrt(log_total_visits / child.visits)
+        explore = EXPLORATION_PARAMETER * np.sqrt(log_parent_visits / child.visits)
         ucb_score = exploit + explore
 
-        if debug:
-            print(ucb_score)
-
-        if player == 1:     # Invert score if evaluating for opponent's best move
-            ucb_score *= -1
+        #if player == 1:     # Invert score if evaluating for opponent's best move; currently unused since we aren't using maximin and opponent is random
+        #    ucb_score *= -1
         if ucb_score > best_score:
             best_score = ucb_score
             best_action = action
 
     return best_action
 
-
-def update_node_stats(node, score):
-    # Update the node's statistics
+def update_node_stats(node, reward):
     node.visits += 1
-    node.score += score
+    node.score += reward
 
-def MCTS(node, player=2, depth=20):
-    if depth == 0 or game_state_is_terminal(node.board, node.last_move):
-        # Evaluate the game state and return the score
-        score = evaluate_game_state(node)
-        update_node_stats(node, score)
-        return score
+def evaluate_reward(winner, player):
+    if winner <= 0:
+        return 0
+    return 1 if winner == player else -1
 
-    # Expansion
-    if not np.any(node.children):
+def MCTS(node, depth=20, player=2):
+    winner = game_state_is_terminal(node.board, node.last_move)
+    if depth == 0 or winner != 0:                   # Recursion limit or game is over
+        reward = evaluate_reward(winner, player)    # Evaluate game state rewards
+        update_node_stats(node, reward)             # Backpropagation
+        return reward
+
+    # Expansion: if we haven't explored here yet: random rollout
+    if node.visits == 0:
         action = np.random.choice(possible_actions(node.board))
+    # Selection: if we have explored here before: choose the best action based on UCB
     else:
-        # Selection: Choose the best action based on UCB
-        action = select_best_action(node)    
+        action = select_best_action_ucb(node)
 
-    # Simulate: Recursively call MCTS
-    score = MCTS(node.get_child(action), player, depth - 1)
+    # Simulation: Recursively call MCTS
+    reward = MCTS(node.get_child(action), depth - 1, player)    # other player's turn, so rewards for them are negative for us
 
-    # Backpropagation: Update the current node's statistics
-    update_node_stats(node, score)
+    # Backpropagation: Update the current node's reward and visits, and return the reward so ancestors can too
+    update_node_stats(node, reward)
+    return reward
 
-    return score
+def MCTS_until_convergence(node, max_iter=2500):  # Run MCTS repeatedly until exploit score stops changing much 
+    iter = 0
+    old_score = node.score / ( node.visits or 1 )
+    while iter < max_iter:      # In case convergence fails/takes too long
+        MCTS(node)
+        exploit_score = node.score / ( node.visits or 1 )
 
-def MCTS_until_convergence(node, depth=10):
-    score = node.score / ( node.visits or 1 )
-    while True:
-        for _ in range(100):
-            MCTS(node, depth)
-            old_score = score
-            score = node.score / ( node.visits or 1 )
-            if 0. < abs(score - old_score) < EPSILON:
-                return
+        if 0. < abs(exploit_score - old_score) < EPSILON:
+            return
 
-def run_sim():
+        old_score = exploit_score
+        iter += 1
+
+def run_game(printout=True):
     # Board Setup
     board = np.zeros((NUM_ROWS, NUM_COLUMNS), dtype=int)
     last_move = None
     turn = 0
-    root_node = node = Node(np.copy(board)) # root_node being stored separately for printouts and debugging only
+    root_node = node = Node(np.copy(board)) # root_node being stored separately for printouts and debugging
 
+    # Main Game Loop
     while not game_state_is_terminal(board, last_move):
         if turn & 1:            # Player turn  
             MCTS_until_convergence(node)
-            action = select_best_action(node)
-            #print_tree(node, max_depth=1)
+            action = select_best_action_ucb(node)       # TODO: Set exploration parameter to 0 when actually picking real move?
         else:                   # Opponent turn   
             action = np.random.choice(possible_actions(board))
 
         last_move = make_move(board, action, 1 + (turn & 1))
         node = node.get_child(action)
         turn += 1
+        if printout:
+            display_board(board)
 
-    # display_board(board)
-
+    # Game Over & Results
     winner = game_state_is_terminal(board, last_move)
-    # print(f"Winner: {'Draw' if winner == -1 else 'Player ' + str(winner)}")
-    #print_tree(root_node, max_depth=3)
+    if printout:
+        print(f"Winner: {'Draw' if winner == -1 else 'Player ' + str(winner)}")
     return winner
 
-results = [0,0,0]
-for _ in range(NUM_SIMS):
-    winner = run_sim()
-    results[winner] += 1
-
-print(results)
-#start = time.time()
-#print("Time per iter:", (time.time() - start) / count)
+if __name__ == '__main__':
+    #start = time.time()
+    results = [0,0,0]
+    for _ in range(NUM_SIMS):
+        winner = run_game(printout=False)
+        results[winner] += 1
+    #print("Time:", (time.time() - start))
+    print(results)
