@@ -162,22 +162,21 @@ def run_game(printout=True):
     # Board Setup
     board = np.zeros((NUM_ROWS, NUM_COLUMNS), dtype=int)
     last_move = None
-    turn = 0
     root_node = node = Node(np.copy(board)) # root_node being stored separately for printouts and debugging
-
+    player = 1
     # Main Game Loop
     if printout:
         print_board(board)
     while not game_state_is_terminal(board, last_move):
-        if turn & 1:            # Player turn  
+        if player == 2:            # Player turn  
             MCTS_until_convergence(node)
             action = select_best_action(node, exploration=False)
         else:                   # Opponent turn   
             action = np.random.choice(possible_actions(board))
 
-        last_move = make_move(board, action, 1 + (turn & 1))
+        last_move = make_move(board, action, player)
         node = node.get_child(action)
-        turn += 1
+        player = 3 - player
         if printout:
             print_board(board, replace_old=True)
 
