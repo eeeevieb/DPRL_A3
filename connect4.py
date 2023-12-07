@@ -11,7 +11,7 @@ MAX_DEPTH = 20
 MAX_CONVERGENCE_ITER = 2500
 
 class Node:
-    def __init__(self, board, parent=None, last_move=None):
+    def __init__(self, board, last_move=None):
         self.board = board
         self.last_move = last_move  # The move that led to this node
         self.children = np.empty(NUM_COLUMNS, dtype=Node)
@@ -23,7 +23,7 @@ class Node:
             child_board = np.copy(self.board)
             player = 3 - self.board[self.last_move] if self.last_move else 1  # opposite of last_move player, default player 1
             move = make_move(child_board, action, player)
-            self.children[action] = Node(child_board, self, move)
+            self.children[action] = Node(child_board, move)
         return self.children[action]
 
 def print_tree(node, depth=0, max_depth=3):
@@ -160,10 +160,16 @@ def MCTS_until_convergence(node):  # Run MCTS repeatedly until exploit score sto
 
 def run_game(printout=True):
     # Board Setup
-    board = np.zeros((NUM_ROWS, NUM_COLUMNS), dtype=int)
-    last_move = None
-    root_node = node = Node(np.copy(board)) # root_node being stored separately for printouts and debugging
-    player = 1
+    board = np.array([[1,2,2,2,1,1,2],
+                      [0,2,1,1,2,1,0],
+                      [0,2,2,2,1,2,0],
+                      [0,1,1,1,2,1,0],
+                      [0,2,2,1,1,2,0],
+                      [0,2,1,1,2,1,0]]) #np.zeros((NUM_ROWS, NUM_COLUMNS), dtype=int)
+    last_move = (0,0)
+    player = 2
+    root_node = node = Node(np.copy(board), last_move) # root_node being stored separately for printouts and debugging
+
     # Main Game Loop
     if printout:
         print_board(board)
