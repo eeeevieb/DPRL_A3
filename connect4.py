@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 NUM_ROWS = 6
 NUM_COLUMNS = 7
-EXPLORATION_PARAMETER = np.sqrt(2.)
+EXPLORATION_PARAMETER = 5.
 EPSILON = 0.001
 NUM_SIMS = 20
 MAX_DEPTH = 20
@@ -17,6 +17,7 @@ class Node:
         self.children = np.empty(NUM_COLUMNS, dtype=Node)
         self.score = 0
         self.visits = 0
+        self.wins = 0
 
     def get_child(self, action):
         if self.children[action] is None:   # Lazy expansion
@@ -105,9 +106,11 @@ def select_best_action(node, exploration=True):     # Calculate best action base
             return action
 
         # UCB formula
-        ucb_score = child.score / child.visits      # Exploit
         if exploration:                             # Explore
+            ucb_score = child.wins / child.visits
             ucb_score += EXPLORATION_PARAMETER * np.sqrt(log_parent_visits / child.visits)
+        else:
+            ucb_score = child.score / child.visits      # Q_Value
 
         if ucb_score > best_score:
             best_score = ucb_score
@@ -116,6 +119,8 @@ def select_best_action(node, exploration=True):     # Calculate best action base
     return best_action
 
 def update_node_stats(node, reward):
+    if reward == 1:
+        node.wins += 1
     node.visits += 1
     node.score += reward
 
@@ -200,7 +205,7 @@ def run_game(printout=True):
         if printout:
             print_board(board, replace_old=True)
 
-    #print_tree(root_node)
+    print_tree(root_node)
     # Game Over & Results
     winner = game_state_is_terminal(board, last_move)
     if printout:
