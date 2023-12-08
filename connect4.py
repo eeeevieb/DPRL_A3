@@ -1,6 +1,6 @@
 import numpy as np
 import sys
-import time
+import matplotlib.pyplot as plt
 
 NUM_ROWS = 6
 NUM_COLUMNS = 7
@@ -145,27 +145,41 @@ def MCTS(node, depth=MAX_DEPTH):
     update_node_stats(node, reward)
     return reward
 
-def MCTS_until_convergence(node):  # Run MCTS repeatedly until exploit score stops changing much 
+def MCTS_until_convergence(node):
     iter = 0
-    old_score = node.score / ( node.visits or 1 )
-    while iter < MAX_CONVERGENCE_ITER:      # In case convergence fails/takes too long
+    old_score = node.score / (node.visits or 1)
+    q_values = []  # List to store exploit scores for plotting
+
+    while iter < MAX_CONVERGENCE_ITER:  # In case convergence fails/takes too long
         MCTS(node)
-        exploit_score = node.score / ( node.visits or 1 )
+        q_value = node.score / (node.visits or 1)
+        q_values.append(q_value)  # Record the exploit score
 
-        if 0. < abs(exploit_score - old_score) < EPSILON:
-            return
+        if 0. < abs(q_value - old_score) < EPSILON:
+            break
 
-        old_score = exploit_score
+        old_score = q_value
         iter += 1
+
+    # Plotting the q_values
+    plt.plot(q_values)
+    plt.xlabel('Iteration')
+    plt.ylabel('Exploit Score')
+    plt.title('Exploit Score of Root Node Over Iterations')
+    # plt.show()
+
 
 def run_game(printout=True):
     # Board Setup
+    # board = np.zeros((NUM_ROWS, NUM_COLUMNS), dtype=int)
+    # last_move = None
+    # player = 1
     board = np.array([[1,2,2,2,1,1,2],
                       [0,2,1,1,2,1,0],
                       [0,2,2,2,1,2,0],
                       [0,1,1,1,2,1,0],
                       [0,2,2,1,1,2,0],
-                      [0,2,1,1,2,1,0]]) #np.zeros((NUM_ROWS, NUM_COLUMNS), dtype=int)
+                      [0,2,1,1,2,1,0]])
     last_move = (0,0)
     player = 2
     root_node = node = Node(np.copy(board), last_move) # root_node being stored separately for printouts and debugging
@@ -186,6 +200,7 @@ def run_game(printout=True):
         if printout:
             print_board(board, replace_old=True)
 
+    #print_tree(root_node)
     # Game Over & Results
     winner = game_state_is_terminal(board, last_move)
     if printout:
@@ -193,11 +208,9 @@ def run_game(printout=True):
     return winner
 
 if __name__ == '__main__':
-    #start = time.time()
     results = [0,0,0]
     for _ in range(NUM_SIMS):
         winner = run_game(printout=True)
         results[winner] += 1
         print(f"Results[Draw/Loss/Win]: {results}\t\t\t", end="\r")
     print()
-    #print("Time:", (time.time() - start))
