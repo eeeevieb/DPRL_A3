@@ -5,9 +5,10 @@ import matplotlib.pyplot as plt
 NUM_ROWS = 6
 NUM_COLUMNS = 7
 EXPLORATION_PARAMETER = 5.
-EPSILON = 0.001
-NUM_SIMS = 20
-MAX_DEPTH = 20
+EPSILON = 0.0005
+NUM_SIMS = 100
+MAX_DEPTH = 30
+MIN_CONVERGENCE_ITER = 300
 MAX_CONVERGENCE_ITER = 2500
 
 class Node:
@@ -34,7 +35,7 @@ def print_tree(node, depth=0, max_depth=3):
     # Print the current node's details
     indent = " " * (depth * 2)
     move = node.last_move if node.last_move is not None else "Root"
-    print(f"{indent}Node: {move}, Score: {node.score}, Visits: {node.visits}")
+    print(f"{indent}Node: {move}, Score: {node.score}, Wins: {node.wins}, Visits: {node.visits}, Win Rate: {node.wins/node.visits}")
 
     # Recursively print children nodes
     for child in node.children:
@@ -95,22 +96,35 @@ def make_move(board, col, player):
             board[row, col] = player
             return (row, col)
 
-def select_best_action(node, exploration=True):     # Calculate best action based on UCB (Exploit + Explore)
+def select_best_action_q_value(node):
+    best_value = -float('inf')
+    best_action = None
+
+    for action, child in enumerate(node.children):
+        if child is None:
+            continue
+        q_value = child.score / child.visits
+
+        if q_value > best_value:
+            best_value = q_value
+            best_action = action
+
+    return best_action
+
+def select_exploration_node_ucb(node):     # Calculate next node to explore based on UCB (Exploit + Explore)
     log_parent_visits = np.log(node.visits)
     best_score = -float('inf')
     best_action = None
 
     for action in possible_actions(node.board):
         child = node.children[action]
-        if child is None and exploration:           # Prioritize exploring unvisited nodes
+        if child is None:           # Prioritize exploring unvisited nodes
             return action
 
-        # UCB formula
-        if exploration:                             # Explore
-            ucb_score = child.wins / child.visits
-            ucb_score += EXPLORATION_PARAMETER * np.sqrt(log_parent_visits / child.visits)
-        else:
-            ucb_score = child.score / child.visits      # Q_Value
+        # UCB formula   (Exploit + Explore)
+        exploit = child.wins / child.visits                                             # Exploit is calculated with win rate as per slides and TA comments
+        explore = EXPLORATION_PARAMETER * np.sqrt(log_parent_visits / child.visits)     # Explore
+        ucb_score = exploit + explore
 
         if ucb_score > best_score:
             best_score = ucb_score
@@ -119,9 +133,9 @@ def select_best_action(node, exploration=True):     # Calculate best action base
     return best_action
 
 def update_node_stats(node, reward):
+    node.visits += 1
     if reward == 1:
         node.wins += 1
-    node.visits += 1
     node.score += reward
 
 def evaluate_reward(winner):
@@ -141,7 +155,7 @@ def MCTS(node, depth=MAX_DEPTH):
         action = np.random.choice(possible_actions(node.board))
     # Selection: if we have explored here before, choose the best action based on UCB
     else:
-        action = select_best_action(node)
+        action = select_exploration_node_ucb(node)
 
     # Simulation: Recursively call MCTS
     reward = MCTS(node.get_child(action), depth - 1)
@@ -150,72 +164,74 @@ def MCTS(node, depth=MAX_DEPTH):
     update_node_stats(node, reward)
     return reward
 
-def MCTS_until_convergence(node):
-    iter = 0
-    old_score = node.score / (node.visits or 1)
-    q_values = []  # List to store exploit scores for plotting
+def MCTS_until_convergence(node, display=False):
+    if display:
+        q_values = []  # List to store q values for plotting
+    old_q_value = node.score / max(node.visits, 1)
 
-    while iter < MAX_CONVERGENCE_ITER:  # In case convergence fails/takes too long
+    while node.visits < MAX_CONVERGENCE_ITER:    # Max iterations to stop infinite calculation
+        # Run one simulation and update the score
         MCTS(node)
-        q_value = node.score / (node.visits or 1)
-        q_values.append(q_value)  # Record the exploit score
+        q_value = node.score / node.visits
+        if display:
+            q_values.append(q_value)
 
-        if 0. < abs(q_value - old_score) < EPSILON:
+        # Convergence check, min iterations so that draws don't trigger convergence too early
+        if abs(q_value - old_q_value) < EPSILON and node.visits > MIN_CONVERGENCE_ITER:
             break
 
-        old_score = q_value
-        iter += 1
+        old_q_value = q_value
 
     # Plotting the q_values
-    plt.plot(q_values)
-    plt.xlabel('Iteration')
-    plt.ylabel('Exploit Score')
-    plt.title('Exploit Score of Root Node Over Iterations')
-    # plt.show()
+    if display:
+        plt.plot(q_values)
+        plt.xlabel('Iteration'); plt.ylabel('Q Value'); plt.title('Q Value of Root Node Over Iterations')
+        plt.show()
 
-
-def run_game(printout=True):
+def run_game(display=True):
     # Board Setup
-    # board = np.zeros((NUM_ROWS, NUM_COLUMNS), dtype=int)
-    # last_move = None
-    # player = 1
-    board = np.array([[1,2,2,2,1,1,2],
-                      [0,2,1,1,2,1,0],
-                      [0,2,2,2,1,2,0],
-                      [0,1,1,1,2,1,0],
-                      [0,2,2,1,1,2,0],
-                      [0,2,1,1,2,1,0]])
-    last_move = (0,0)
-    player = 2
+    board = np.zeros((NUM_ROWS, NUM_COLUMNS), dtype=int)
+    last_move = None
+    player = 1
+    
+    # Example starting state
+    # board = np.array([[1,2,2,2,1,1,2],
+    #                   [0,2,1,1,2,1,0],
+    #                   [0,2,2,2,1,2,0],
+    #                   [0,1,1,1,2,1,0],
+    #                   [0,2,2,1,1,2,0],
+    #                   [0,2,1,1,2,1,0]], dtype=int)
+    # last_move = (0,0)
+    # player = 2
     root_node = node = Node(np.copy(board), last_move) # root_node being stored separately for printouts and debugging
 
     # Main Game Loop
-    if printout:
+    if display:
         print_board(board)
     while not game_state_is_terminal(board, last_move):
         if player == 2:            # Player turn  
-            MCTS_until_convergence(node)
-            action = select_best_action(node, exploration=False)
+            MCTS_until_convergence(node, False)
+            action = select_best_action_q_value(node)
         else:                   # Opponent turn   
             action = np.random.choice(possible_actions(board))
 
         last_move = make_move(board, action, player)
         node = node.get_child(action)
         player = 3 - player
-        if printout:
+        if display:
             print_board(board, replace_old=True)
 
-    print_tree(root_node)
     # Game Over & Results
     winner = game_state_is_terminal(board, last_move)
-    if printout:
+    if display:
         print(f"Winner: {'Draw' if winner == -1 else 'Player ' + str(winner)}")
+        #print_tree(root_node)
     return winner
 
 if __name__ == '__main__':
     results = [0,0,0]
     for _ in range(NUM_SIMS):
-        winner = run_game(printout=True)
+        winner = run_game(display=True)
         results[winner] += 1
         print(f"Results[Draw/Loss/Win]: {results}\t\t\t", end="\r")
     print()
