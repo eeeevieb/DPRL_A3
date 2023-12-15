@@ -70,6 +70,28 @@ class TabularQLearningAgent:
         self.q_table[state[0], state[1], action_index] *= (1 - ALPHA_LEARNING)
         self.q_table[state[0], state[1], action_index] += ALPHA_LEARNING * (reward + GAMMA_DISCOUNT * next_max)
 
+    def print_q_values(self):
+        print("Maze Q-Values:")
+        for i in range(MAZE_SIZE):
+            # First line for 'up' values
+            for j in range(MAZE_SIZE):
+                up_value = "{:.2f}".format(self.q_table[i,j, 0])  # Assuming 'up' is the first action
+                print(f"    {up_value}     ", end="")
+            print()
+
+            # Second line for 'left' and 'right' values
+            for j in range(MAZE_SIZE):
+                left_value = "{:.2f}".format(self.q_table[i,j, 2])  # Assuming 'left' is the third action
+                right_value = "{:.2f}".format(self.q_table[i,j, 3])  # Assuming 'right' is the fourth action
+                print(f"{left_value} | {right_value} ", end=" ")
+            print()
+
+            # Third line for 'down' values
+            for j in range(MAZE_SIZE):
+                down_value = "{:.2f}".format(self.q_table[i,j, 1])  # Assuming 'down' is the second action
+                print(f"    {down_value}     ", end="")
+            print("\n")  # Extra newline for spacing between rows
+
     def print_q_table(self):
         print(f"                 up     down    left    right")
         for row in range(MAZE_SIZE):
@@ -83,4 +105,4 @@ agent.learn()
 
 maze.reset()
 maze.print_maze()
-agent.print_q_table()
+agent.print_q_values()
