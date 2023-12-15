@@ -18,10 +18,10 @@ class Maze:
         self.state = self.start
         return self.state
 
-    def step(self, delta):
+    def step(self, action):
         # Calculate the next state
-        next_state = (max(min(self.state[0] + delta[0], MAZE_SIZE - 1), 0),
-                      max(min(self.state[1] + delta[1], MAZE_SIZE - 1), 0))
+        next_state = (max(min(self.state[0] + action[0], MAZE_SIZE - 1), 0),
+                      max(min(self.state[1] + action[1], MAZE_SIZE - 1), 0))
 
         # Check if the goal is reached
         done = (next_state == self.goal)
@@ -63,12 +63,12 @@ class TabularQLearningAgent:
         else:
             return np.argmax(self.q_table[state_index[0], state_index[1]])
 
-    def update_q_table(self, state, action, reward, next_state):
+    def update_q_table(self, state, action_index, reward, next_state):
         next_max = np.max(self.q_table[next_state[0], next_state[1]])
 
         # Calculate new Q-value
-        self.q_table[state[0], state[1], action] *= (1 - ALPHA_LEARNING)
-        self.q_table[state[0], state[1], action] += ALPHA_LEARNING * (reward + GAMMA_DISCOUNT * next_max)
+        self.q_table[state[0], state[1], action_index] *= (1 - ALPHA_LEARNING)
+        self.q_table[state[0], state[1], action_index] += ALPHA_LEARNING * (reward + GAMMA_DISCOUNT * next_max)
 
     def print_q_table(self):
         print(f"                 up     down    left    right")
