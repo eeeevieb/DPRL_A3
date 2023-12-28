@@ -1,9 +1,11 @@
 import numpy as np
 
-MAZE_SIZE = 5
-NUM_EPISODES = 10000
+MAZE_SIZE = 3
+NUM_EPISODES = 2000
 ALPHA_LEARNING = 0.2
-EPSILON_EXPLORATION = 0.7
+EPSILON_INITIAL = 0.99
+EPSILON_DECAY = 0.999
+EPSILON_MIN = 0.1
 GAMMA_DISCOUNT = 0.9
 
 ACTIONS = [(1, 0), (-1, 0), (0, -1), (0, 1)]  # up, down, left, right
@@ -33,10 +35,11 @@ class Maze:
         return 0, next_state
 
     def print_maze(self):
+        print("a = agent, X = goal")
         for i in reversed(range(MAZE_SIZE)):
             for j in range(MAZE_SIZE):
                 if (i, j) == self.state:
-                    print('o', end=' ')
+                    print('a', end=' ')
                 elif (i, j) in self.goal_state_rewards:
                     print('X', end=' ')
                 else:
@@ -45,12 +48,14 @@ class Maze:
         print()
 
 class Agent:
-    def __init__(self, maze_env):
+    def __init__(self, maze_env, epsilon_initial = EPSILON_INITIAL):
         self.maze_env = maze_env
         self.q_table = np.zeros((MAZE_SIZE, MAZE_SIZE, len(ACTIONS)))
+        self.epsilon = epsilon_initial
 
     def learn(self, episodes=NUM_EPISODES):
         for _ in range(episodes):
+            self.epsilon = max(EPSILON_MIN, self.epsilon * EPSILON_DECAY)
             state = self.maze_env.reset()
 
             while state is not None:
@@ -60,7 +65,7 @@ class Agent:
                 self.update_q_table(old_state, action_index, reward, state)
 
     def select_action(self, state_index):
-        if np.random.rand() < EPSILON_EXPLORATION:
+        if np.random.rand() < self.epsilon:
             return np.random.randint(len(ACTIONS))
         else:
             return np.argmax(self.q_table[state_index[0], state_index[1]])
