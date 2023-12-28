@@ -1,8 +1,7 @@
 import numpy as np
 
-NUM_EPISODES = 2000
-ALPHA_LEARNING = 0.2
-EPSILON_INITIAL = 0.99
+ALPHA_LEARNING = 0.25
+EPSILON_INITIAL = 1.0
 EPSILON_DECAY = 0.999
 EPSILON_MIN = 0.1
 GAMMA_DISCOUNT = 0.9
@@ -55,7 +54,7 @@ class Agent:
         self.q_table = np.zeros((maze_env.size, maze_env.size, len(ACTIONS)))
         self.epsilon_exploration = epsilon_initial
 
-    def learn(self, episodes=NUM_EPISODES):
+    def learn(self, episodes):
         for _ in range(episodes):
             self.epsilon_exploration = max(EPSILON_MIN, self.epsilon_exploration * EPSILON_DECAY)
             state = self.maze_env.reset()
@@ -109,7 +108,7 @@ if __name__ == '__main__':
     maze.print_maze()
 
     agent = Agent(maze)
-    agent.learn()
+    agent.learn(episodes=250)
     agent.print_q_table()
 
     # Part 2
@@ -121,5 +120,5 @@ if __name__ == '__main__':
     maze.print_maze()
 
     agent = Agent(maze)
-    agent.learn()
+    agent.learn(episodes=2500)
     agent.print_q_table()
