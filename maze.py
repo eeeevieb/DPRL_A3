@@ -3,10 +3,10 @@ import numpy as np
 MAZE_SIZE = 5
 NUM_EPISODES = 10000
 ALPHA_LEARNING = 0.2
-EPSILON_EXPLORATION = 0.4
+EPSILON_EXPLORATION = 0.7
 GAMMA_DISCOUNT = 0.9
 
-ACTIONS = [(-1, 0), (1, 0), (0, -1), (0, 1)]  # up, down, left, right
+ACTIONS = [(1, 0), (-1, 0), (0, -1), (0, 1)]  # up, down, left, right
 
 class Maze:
     def __init__(self, start=(0, 0), goal_states = {(MAZE_SIZE - 1, MAZE_SIZE - 1): 1.0}):
@@ -33,7 +33,7 @@ class Maze:
         return 0, next_state
 
     def print_maze(self):
-        for i in range(MAZE_SIZE):
+        for i in reversed(range(MAZE_SIZE)):
             for j in range(MAZE_SIZE):
                 if (i, j) == self.state:
                     print('o', end=' ')
@@ -75,7 +75,7 @@ class Agent:
 
     def print_q_table(self):
         print("Maze Q-Values:")
-        for i in range(MAZE_SIZE):
+        for i in reversed(range(MAZE_SIZE)):
             # First line for 'up' values
             for j in range(MAZE_SIZE):
                 up_value = "{:.2f}".format(self.q_table[i,j, 0])  # Assuming 'up' is the first action
