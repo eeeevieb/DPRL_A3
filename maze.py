@@ -1,6 +1,5 @@
 import numpy as np
 
-MAZE_SIZE = 3
 NUM_EPISODES = 2000
 ALPHA_LEARNING = 0.2
 EPSILON_INITIAL = 0.99
@@ -11,14 +10,16 @@ GAMMA_DISCOUNT = 0.9
 ACTIONS = [(1, 0), (-1, 0), (0, -1), (0, 1)]  # up, down, left, right
 
 class Maze:
-    def __init__(self, start=(0, 0), goal_state_rewards = {(MAZE_SIZE - 1, MAZE_SIZE - 1): 1.0}):
-        self.start = start
+    def __init__(self, size = 3, goal_state_rewards = None):
+        self.size = size
+        if goal_state_rewards is None:
+            goal_state_rewards = {(size - 1, size - 1): 1.0}
         self.goal_state_rewards = goal_state_rewards
-        self.state = start
+        self.state = (0,0)
 
     # Reset the maze to the start state
     def reset(self):
-        self.state = self.start
+        self.state = (0,0)
         return self.state
 
     # Execute a step in the maze based on the given action
@@ -28,8 +29,8 @@ class Maze:
             return self.goal_state_rewards[self.state], None    # Return the reward and indicate the episode is finished
 
         # Calculate the next state while ensuring it stays within maze bounds
-        next_state = (max(min(self.state[0] + action[0], MAZE_SIZE - 1), 0),    # max(min()) to clamp values: attempting to leave maze bounds just wastes a turn
-                      max(min(self.state[1] + action[1], MAZE_SIZE - 1), 0))
+        next_state = (max(min(self.state[0] + action[0], self.size - 1), 0),    # max(min()) to clamp values: attempting to leave maze bounds just wastes a turn
+                      max(min(self.state[1] + action[1], self.size - 1), 0))
 
         # Update location
         self.state = next_state
@@ -37,9 +38,8 @@ class Maze:
         return 0, next_state        # Return a reward of 0, and the calculated next_state
 
     def print_maze(self):
-        print("a = agent, X = goal")
-        for i in reversed(range(MAZE_SIZE)):
-            for j in range(MAZE_SIZE):
+        for i in reversed(range(self.size)):
+            for j in range(self.size):
                 if (i, j) == self.state:                    # Agent's current location
                     print('a', end=' ')
                 elif (i, j) in self.goal_state_rewards:     # Goal state
@@ -52,7 +52,7 @@ class Maze:
 class Agent:
     def __init__(self, maze_env, epsilon_initial = EPSILON_INITIAL):
         self.maze_env = maze_env
-        self.q_table = np.zeros((MAZE_SIZE, MAZE_SIZE, len(ACTIONS)))
+        self.q_table = np.zeros((maze_env.size, maze_env.size, len(ACTIONS)))
         self.epsilon_exploration = epsilon_initial
 
     def learn(self, episodes=NUM_EPISODES):
@@ -82,35 +82,44 @@ class Agent:
 
     def print_q_table(self):
         print("Maze Q-Values:")
-        for i in reversed(range(MAZE_SIZE)):
+        for i in reversed(range(self.maze_env.size)):
             # First line for 'up' values
-            for j in range(MAZE_SIZE):
+            for j in range(self.maze_env.size):
                 up_value = "{:.2f}".format(self.q_table[i,j, 0])  # 'up' is the first action
                 print(f"    {up_value}     ", end="")
             print()
 
             # Second line for 'left' and 'right' values
-            for j in range(MAZE_SIZE):
+            for j in range(self.maze_env.size):
                 left_value = "{:.2f}".format(self.q_table[i,j, 2])  # 'left' is the third action
                 right_value = "{:.2f}".format(self.q_table[i,j, 3])  # 'right' is the fourth action
                 print(f"{left_value} | {right_value} ", end=" ")
             print()
 
             # Third line for 'down' values
-            for j in range(MAZE_SIZE):
+            for j in range(self.maze_env.size):
                 down_value = "{:.2f}".format(self.q_table[i,j, 1])  # 'down' is the second action
                 print(f"    {down_value}     ", end="")
             print("\n")
         print()
 
-goal_states = {
-                (MAZE_SIZE - 1, MAZE_SIZE - 1): 1.0,
-                # (MAZE_SIZE - 1, 0)            : 0.5
-                }
+if __name__ == '__main__':
+    # Part 1
+    maze = Maze(size = 3)
+    maze.print_maze()
 
-maze = Maze(goal_state_rewards=goal_states)
-maze.print_maze()
+    agent = Agent(maze)
+    agent.learn()
+    agent.print_q_table()
 
-agent = Agent(maze)
-agent.learn()
-agent.print_q_table()
+    # Part 2
+    goal_state_rewards = { 
+                            (4, 4): 1.0,
+                            (4, 0): 0.5
+                            }
+    maze = Maze(size = 5, goal_state_rewards = goal_state_rewards)
+    maze.print_maze()
+
+    agent = Agent(maze)
+    agent.learn()
+    agent.print_q_table()
