@@ -1,14 +1,13 @@
+import matplotlib.pyplot as plt
 import numpy as np
-
-ALPHA_LEARNING = 0.25
-EPSILON_INITIAL = 1.0
-EPSILON_DECAY = 0.999
-EPSILON_MIN = 0.1
-GAMMA_DISCOUNT = 0.9
+import time
 
 ACTIONS = [(1, 0), (-1, 0), (0, -1), (0, 1)]  # up, down, left, right
+ALPHA_MIN = 0.1
+EPSILON_MIN = 0.1
+CALC_HYPERPARAMS = False
 
-class Maze:
+class MazeEnvironment:
     def __init__(self, size = 3, goal_state_rewards = None):
         self.size = size
         if goal_state_rewards is None:
@@ -48,15 +47,29 @@ class Maze:
             print()
         print()
 
-class Agent:
-    def __init__(self, maze_env, epsilon_initial = EPSILON_INITIAL):
+class TabularQLearningAgent:
+    def __init__(self, maze_env, alpha_learning, alpha_decay, epsilon_initial, epsilon_decay, discount_factor):
         self.maze_env = maze_env
         self.q_table = np.zeros((maze_env.size, maze_env.size, len(ACTIONS)))
         self.epsilon_exploration = epsilon_initial
+        self.alpha_learning = alpha_learning
+        self.alpha_decay = alpha_decay
+        self.epsilon_decay = epsilon_decay
+        self.discount_factor = discount_factor
 
-    def learn(self, episodes):
+    def learn_tabular(self, episodes):
         for _ in range(episodes):
-            self.epsilon_exploration = max(EPSILON_MIN, self.epsilon_exploration * EPSILON_DECAY)
+            for i in range(self.maze_env.size):
+                for j in range(self.maze_env.size):
+                    for action_index, action in enumerate(ACTIONS):
+                        self.maze_env.state = (i, j)  # Set current state
+                        reward, next_state = self.maze_env.step(action)  # Simulate the step
+                        self.update_q_table((i, j), action_index, reward, next_state)
+
+    def learn_epsilon_greedy(self, episodes):
+        for _ in range(episodes):
+            self.epsilon_exploration = max(EPSILON_MIN, self.epsilon_exploration * self.epsilon_decay)
+            self.alpha_learning = max(ALPHA_MIN, self.alpha_learning * self.alpha_decay)
             state = self.maze_env.reset()
 
             while state is not None:
@@ -65,19 +78,18 @@ class Agent:
                 reward, state = self.maze_env.step(ACTIONS[action_index])
                 self.update_q_table(old_state, action_index, reward, state)
 
-    def select_action(self, state_index):
+    def select_action(self, state):
         if np.random.rand() < self.epsilon_exploration:
             return np.random.randint(len(ACTIONS))
         else:
-            return np.argmax(self.q_table[state_index[0], state_index[1]])
+            return np.argmax(self.q_table[state[0], state[1]])
 
     def update_q_table(self, old_state, action_index, reward, state):
-        if state is not None:   # If not in terminal state, include discounted future reward
-            reward += GAMMA_DISCOUNT * np.max(self.q_table[state[0], state[1]])
+        if state is not None:
+            reward += self.discount_factor * np.max(self.q_table[state[0], state[1]])
 
-        # Update the Q-value of the state-action we just left
-        self.q_table[old_state[0], old_state[1], action_index] *= (1 - ALPHA_LEARNING)
-        self.q_table[old_state[0], old_state[1], action_index] += ALPHA_LEARNING * reward
+        self.q_table[old_state[0], old_state[1], action_index] *= (1 - self.alpha_learning)
+        self.q_table[old_state[0], old_state[1], action_index] += self.alpha_learning * reward
 
     def print_q_table(self):
         print("Maze Q-Values:")
@@ -102,23 +114,74 @@ class Agent:
             print("\n")
         print()
 
-if __name__ == '__main__':
-    # Part 1
-    maze = Maze(size = 3)
-    maze.print_maze()
+def calc_best_hyperparameters():
+    # Define hyperparameter ranges
+    alpha_learning_rates = [0.9, 0.7, 0.5, 0.2]
+    alpha_decays = [0.9, 0.95, 0.99]
+    epsilon_initials = [1.0, 0.7, 0.5]
+    epsilon_decays = [0.99, 0.95, 0.90]
+    discount_factors = [0.9, 0.95, 0.99]
 
-    agent = Agent(maze)
-    agent.learn(episodes=250)
+    # Organize data by hyperparameter
+    hp_dict = []
+    #print('first', hp_dict)
+    for lr in alpha_learning_rates:
+        for lr_decay in alpha_decays:
+            for eps_init in epsilon_initials:
+                for eps_decay in epsilon_decays:
+                    for df in discount_factors:
+                        start_time = time.time()
+
+                        for _ in range(2):  # Run each setting 10 times
+                            maze = MazeEnvironment(size=3)  # Assuming a predefined MazeEnvironment
+                            agent = TabularQLearningAgent(maze, lr, lr_decay, eps_init, eps_decay, df)
+                            agent.learn_epsilon_greedy(episodes=350)
+
+                        end_time = time.time()
+                        total_time = end_time - start_time
+                        hp_dict.append((lr, lr_decay, eps_init, eps_decay, df, total_time))
+
+    hp_dict.sort(key=lambda x: x[-1])   # Sort by time, though note we still check correctness
+
+    # lr, lr_decay, eps_init, eps_decay, df
+    best_hyperparams = hp_dict[0][:-1]
+
+    # for hp_set in hp_dict:
+    #     print(hp_set)
+    # print('best:', best_hyperparams)
+    return best_hyperparams
+
+def main():
+    if CALC_HYPERPARAMS:
+        hyperparameters = calc_best_hyperparameters()
+    else:
+        hyperparameters = (1, .99, 1, 0.999, 0.9)
+
+    # Part 1.1: Tabular
+    # print("Part 1.1 Tabular")
+    # maze = MazeEnvironment(size=3)
+    # agent = TabularQLearningAgent(maze, 1, 1, None, None, 0.9) 
+    # agent.learn_tabular(episodes=5)
+    # agent.print_q_table()
+
+    # Part 1.2: Epsilon-Greedy
+    print("Running Part 1.2 Epsilon-Greedy")
+    maze = MazeEnvironment(size=3)
+    agent = TabularQLearningAgent(maze, *hyperparameters) 
+    agent.learn_epsilon_greedy(episodes=100)
     agent.print_q_table()
 
     # Part 2
-    goal_state_rewards = { 
-                            (4, 4): 1.0,
-                            (4, 0): 0.5
-                            }
-    maze = Maze(size = 5, goal_state_rewards = goal_state_rewards)
+    print("Running Part 2 with optimal hyperparameters...")
+    goal_state_rewards = {
+        (4, 4): 1.0,
+        (4, 0): 0.5
+    }
+    maze = MazeEnvironment(size=5, goal_state_rewards=goal_state_rewards)
     maze.print_maze()
-
-    agent = Agent(maze)
-    agent.learn(episodes=2500)
+    agent = TabularQLearningAgent(maze, *hyperparameters)
+    agent.learn_epsilon_greedy(episodes=1500)
     agent.print_q_table()
+
+if __name__ == "__main__":
+    main()
