@@ -206,7 +206,7 @@ def main():
     maze = MazeEnvironment(size=5, goal_state_rewards=goal_state_rewards)
     maze.print_maze()
     agent = TabularQLearningAgent(maze, *hyperparameters)
-    agent.learn_epsilon_greedy(max_episodes=250)
+    agent.learn_epsilon_greedy(max_episodes=50)
     agent.print_q_table()
 
 if __name__ == "__main__":
